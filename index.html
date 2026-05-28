@@ -1,0 +1,1421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Weather Fashion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=B612+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300,0,0&display=block" rel="stylesheet" />
+<style>
+  :root {
+    --bg:          #ffffff;
+    --panel:       #ffffff;
+    --panel-2:     #f4f4f4;
+    --line:        #e8e8e8;
+    --line-2:      #d4d4d4;
+    --ink:         #111111;
+    --placeholder: #d8d8d8;
+    --mono:        "B612 Mono", ui-monospace, Menlo, monospace;
+    --mood:        #c9cdd3;
+  }
+
+  /* ── Night mode ────────────────────────────────────────── */
+  html.night {
+    --bg:          #0a0a0a;
+    --panel:       #0a0a0a;
+    --panel-2:     #1a1a1a;
+    --line:        #222222;
+    --line-2:      #333333;
+    --ink:         #f0ede5;
+    --placeholder: #1a1a1a;
+  }
+  html.night .sidebar   { border-color: var(--ink) !important; background: var(--bg) !important; }
+  html.night .locate-btn { border-color: #f0ede5; background: #f0ede5; color: #0a0a0a; }
+  html.night .locate-btn:hover { background: #0a0a0a; color: #f0ede5; }
+  html.night .runway-name { color: var(--ink) !important; }
+  html.night .stage-temp,
+  html.night #vTemp      { color: var(--ink) !important; }
+  body { transition: background-color 0.8s ease, color 0.8s ease; }
+
+  /* ── Reset ─────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { min-height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+    letter-spacing: -1px;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  button, input { font-family: inherit; letter-spacing: inherit; }
+  button { background: none; border: none; color: inherit; cursor: pointer; padding: 0; }
+  input  { background: none; border: none; color: inherit; outline: none; width: 100%; }
+  ::selection { background: var(--ink); color: var(--bg); }
+
+  /* Disable transitions during resize to prevent breakpoint-crossing glitch */
+  .resizing .sidebar,
+  .resizing .hamburger .ms,
+  .resizing .stage-weather,
+  .resizing .runway-wrap { transition: none !important; }
+
+  /* ── Layout ────────────────────────────────────────────── */
+  .layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    padding: 20px;
+    min-height: 100vh;
+    align-items: stretch;
+  }
+
+  /* ── Sidebar ───────────────────────────────────────────── */
+  .sidebar {
+    background: var(--panel);
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    position: sticky;
+    top: 20px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    align-self: start;
+  }
+  .sidebar::-webkit-scrollbar { width: 0; }
+
+  .label {
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.16em;
+    color: var(--ink);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  /* Location */
+  .location {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .location .ms {
+    font-family: 'Material Symbols Outlined';
+    font-size: 24px;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  }
+
+  /* Time */
+  .time-value {
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+
+  /* Search */
+  .search {
+    border: none;
+    border-bottom: 1px solid var(--ink);
+    padding: 8px 0;
+    background: transparent;
+    transition: border-color 0.2s;
+  }
+  .search input { font-size: 12px; }
+  .search input::placeholder { color: #D0D6DA; opacity: 1; letter-spacing: -1px; }
+
+  .search-results {
+    margin-top: 8px;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s;
+  }
+  .search-results.open { max-height: 200px; overflow-y: auto; }
+  .search-results::-webkit-scrollbar { width: 0; }
+  .search-result {
+    padding: 8px 16px;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 0;
+    color: var(--ink);
+  }
+  .search-result:hover { background: var(--panel-2); }
+
+  /* City list */
+  .cities {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .city {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 4px 0 4px 12px;
+    font-size: 12px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+  .city::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    top: 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .city:hover { transform: translateX(4px); }
+  .city:hover::before,
+  .city.active::before { opacity: 1; }
+  .city-time {
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    color: var(--ink);
+  }
+
+  /* Locate button */
+  .locate-btn {
+    margin-top: 4px;
+    border: 1px solid #111111;
+    border-radius: 0;
+    padding: 12px 16px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: #111111;
+    color: #ffffff;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+  .locate-btn:hover {
+    background: #ffffff;
+    color: #111111;
+  }
+  .locate-btn .ms {
+    font-family: 'Material Symbols Outlined';
+    font-size: 16px;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+  }
+  .locate-error {
+    display: none;
+    margin-top: 8px;
+    padding: 8px 10px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #c0392b;
+    background: #fdf0ee;
+    border-left: 2px solid #c0392b;
+  }
+  .locate-error.visible { display: block; }
+  html.night .locate-error { background: #2a1010; color: #e87070; border-color: #e87070; }
+
+  /* ── Hamburger (mobile only) ──────────────────────────── */
+  .hamburger {
+    display: none;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--ink);
+  }
+  .hamburger .ms {
+    font-family: 'Material Symbols Outlined';
+    font-size: 24px;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+    transition: opacity 0.18s ease, transform 0.35s cubic-bezier(0.4,0,0.2,1);
+    display: inline-block;
+  }
+  .hamburger.open .ms { transform: rotate(90deg); }
+
+  /* ── Stage weather row ────────────────────────────────── */
+  .stage-weather {
+    width: 100%;
+    max-width: min(640px, calc((100vh - 240px) * 0.8));
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .stage-temp-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .stage-temp {
+    font-size: 32px;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  .unit-toggle {
+    background: transparent;
+    border: none;
+    padding: 4px 8px;
+    font-size: 12px;
+    color: var(--ink);
+    letter-spacing: -1px;
+    line-height: 1;
+    outline: none;
+    cursor: pointer;
+  }
+  .unit-toggle:focus,
+  .unit-toggle:focus-visible { outline: none; box-shadow: none; }
+  .unit-toggle .on { font-weight: 700; }
+
+  .stage-cond {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .stage-cond .wx-icon {
+    font-family: 'Material Symbols Outlined';
+    font-size: 16px;
+    line-height: 1;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* ── Main stage ───────────────────────────────────────── */
+  .stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px 80px;
+    gap: 32px;
+  }
+
+  /* ── Runway wrap + aura ───────────────────────────────── */
+  .runway-wrap {
+    position: relative;
+    width: 100%;
+    max-width: min(640px, calc((100vh - 240px) * 0.8));
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  /* Mood aura — blurred glow behind the image */
+  .runway-wrap::before {
+    content: "";
+    position: absolute;
+    top: -20%; left: -20%; right: -20%; bottom: -5%;
+    background: var(--mood);
+    filter: blur(100px);
+    z-index: -1;
+    pointer-events: none;
+    border-radius: 50%;
+    transition: background 2s ease;
+    animation: aura-breathe 10s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+  /* Figure-8 / lemniscate drift with breathing opacity + scale.
+     X moves at half the frequency of Y, tracing a slow ∞ path.
+     Opacity pulses 0.60 → 1.00, scale pulses 0.95 → 1.05.        */
+  @keyframes aura-breathe {
+    0%   { transform: translate(  0%,   0%  ) scale(1.00); opacity: 0.75; }
+    12%  { transform: translate(  2.0%, 2.5%) scale(0.97); opacity: 0.62; }
+    25%  { transform: translate(  4.0%, 0%  ) scale(1.02); opacity: 0.88; }
+    37%  { transform: translate(  2.0%,-2.5%) scale(1.05); opacity: 1.00; }
+    50%  { transform: translate(  0%,   0%  ) scale(0.95); opacity: 0.60; }
+    62%  { transform: translate( -2.0%, 2.5%) scale(0.97); opacity: 0.66; }
+    75%  { transform: translate( -4.0%, 0%  ) scale(1.02); opacity: 0.86; }
+    87%  { transform: translate( -2.0%,-2.5%) scale(1.05); opacity: 0.98; }
+    100% { transform: translate(  0%,   0%  ) scale(1.00); opacity: 0.75; }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Runway image container */
+  .runway {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    background: var(--placeholder);
+    border: 1px solid var(--line-2);
+    overflow: hidden;
+    position: relative;
+  }
+  /* Skeleton shimmer — visible while first image loads, fades on load */
+  .runway::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      var(--placeholder) 0%,
+      var(--line-2)      45%,
+      var(--placeholder) 100%
+    );
+    background-size: 200% 100%;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+  .runway.loading::before {
+    opacity: 1;
+    animation: skeleton-shimmer 1.6s ease-in-out infinite;
+  }
+  @keyframes skeleton-shimmer {
+    0%   { background-position:  200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  /* Dual-slot crossfade images */
+  .runway-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 20%;
+    opacity: 0;
+    transition: opacity 1s cubic-bezier(0.4,0,0.2,1);
+    display: block;
+  }
+
+  /* Caption row below image */
+  .runway-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .runway-name {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--ink);
+    text-align: center;
+  }
+
+  /* ── Mobile (≤900px) ──────────────────────────────────── */
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+
+    /* Sidebar becomes an animated dropdown */
+    .sidebar {
+      position: fixed !important;
+      top: 112px;
+      left: 16px;
+      right: 16px;
+      bottom: auto !important;
+      width: auto !important;
+      max-width: none;
+      max-height: 0;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1),
+                  padding 0.35s ease,
+                  opacity 0.25s ease,
+                  transform 0.35s cubic-bezier(0.4,0,0.2,1);
+      z-index: 100;
+      background: var(--bg);
+    }
+    .sidebar.open {
+      max-height: calc(100vh - 128px);
+      padding-top: 24px !important;
+      padding-bottom: 24px !important;
+      opacity: 1;
+      transform: translateY(0);
+      overflow-y: auto;
+    }
+
+    .stage { padding: 24px 16px 64px; order: 1; }
+    .runway-wrap,
+    .stage-weather { width: 100%; max-width: min(100%, calc((100vh - 260px) * 0.8)); }
+
+    .hamburger { display: flex; }
+
+    .stage-weather {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 12px;
+    }
+    .hamburger      { justify-self: start; }
+    .stage-temp-row { justify-self: center; }
+    .stage-cond     { justify-self: end; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ── Sidebar ─────────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+
+    <section>
+      <span class="label">Where you are</span>
+      <div class="location">
+        <span class="ms">location_on</span>
+        <span id="vLocation">—</span>
+      </div>
+    </section>
+
+    <section>
+      <span class="label">Time</span>
+      <div class="time-value" id="vTime">—</div>
+    </section>
+
+    <section>
+      <span class="label">Elsewhere</span>
+      <div class="search">
+        <input id="searchInput" type="text" placeholder="Search any city…" autocomplete="off" />
+      </div>
+      <div class="search-results" id="searchResults"></div>
+      <ul class="cities" id="cityList"></ul>
+    </section>
+
+    <button class="locate-btn" id="locateBtn" type="button">
+      <span class="ms">my_location</span>
+      <span>Use my location</span>
+    </button>
+    <div class="locate-error" id="locateError"></div>
+
+  </aside>
+
+  <!-- ── Main stage ──────────────────────────────────────── -->
+  <main class="stage">
+
+    <!-- Weather row: temp+toggle LEFT · icon+condition RIGHT -->
+    <div class="stage-weather" id="stageWeather">
+      <button class="hamburger" id="hamburger" aria-label="Open menu">
+        <span class="ms" id="hamburgerIcon">menu</span>
+      </button>
+      <div class="stage-temp-row">
+        <div class="stage-temp" id="vTemp">—°</div>
+        <button class="unit-toggle" id="unitToggle">
+          <span class="on" id="unitC">C</span> / <span id="unitF">F</span>
+        </button>
+      </div>
+      <div class="stage-cond">
+        <span class="wx-icon" id="vWxIcon" aria-hidden="true">cloud</span>
+        <span id="vCondition">—</span>
+      </div>
+    </div>
+
+    <!-- Runway image + caption -->
+    <div class="runway-wrap">
+      <div class="runway loading" id="runway">
+        <img class="runway-img" id="imgA" alt="">
+        <img class="runway-img" id="imgB" alt="">
+      </div>
+      <div class="runway-footer">
+        <div class="runway-name" id="runwayName">—</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────
+// WMO CODE HELPERS
+// ─────────────────────────────────────────────
+const WMO = {
+  0:"Clear sky", 1:"Mainly clear", 2:"Partly cloudy", 3:"Overcast",
+  45:"Fog", 48:"Rime fog",
+  51:"Light drizzle", 53:"Drizzle", 55:"Dense drizzle",
+  56:"Freezing drizzle", 57:"Freezing drizzle",
+  61:"Light rain", 63:"Rain", 65:"Heavy rain",
+  66:"Freezing rain", 67:"Freezing rain",
+  71:"Light snow", 73:"Snow", 75:"Heavy snow", 77:"Snow grains",
+  80:"Rain showers", 81:"Rain showers", 82:"Violent showers",
+  85:"Snow showers", 86:"Snow showers",
+  95:"Thunderstorm", 96:"Thunderstorm", 99:"Thunderstorm"
+};
+
+function wxIcon(code, isDay) {
+  if (code === 0)                   return isDay ? "sunny"             : "clear_night";
+  if (code === 1 || code === 2)     return isDay ? "partly_cloudy_day" : "partly_cloudy_night";
+  if (code === 3)                   return "cloud";
+  if (code === 45 || code === 48)   return "foggy";
+  if (code >= 51 && code <= 57)     return "rainy_light";
+  if (code >= 61 && code <= 67)     return "rainy";
+  if (code >= 71 && code <= 77)     return "weather_snowy";
+  if (code >= 80 && code <= 82)     return "rainy";
+  if (code >= 85 && code <= 86)     return "weather_snowy";
+  if (code >= 95)                   return "thunderstorm";
+  return "cloud";
+}
+
+// Mood key — every valid WMO code named explicitly; logs every resolution.
+// Priority: NIGHT (time of day) overrides all weather conditions.
+// After that: storm → snow → fog → rain → hot → sunny → golden → cloudy
+function moodKey(code, tempC, tz, sunrise, sunset) {
+  const tempF   = tempC * 9 / 5 + 32;
+  const condStr = WMO[code] ?? `Unknown (${code})`;
+
+  // ── Night takes absolute priority — checked before any weather condition ──
+  if (isNightTime(tz, sunrise, sunset)) {
+    console.log(`[WeatherFashion] "${condStr}" (${code}) → night (time override) | ${Math.round(tempF)}°F | local hour ${getLocalHour(tz)}`);
+    return "night";
+  }
+
+  let base;
+
+  switch (code) {
+    // ── Clear ──────────────────────────────────────────────────
+    case 0:   // Clear sky
+    case 1:   // Mainly clear
+      base = tempF > 90 ? "hot" : "sunny";
+      break;
+
+    // ── Partly cloudy ──────────────────────────────────────────
+    case 2:   // Partly cloudy
+      base = "golden"; break;
+
+    // ── Overcast ───────────────────────────────────────────────
+    case 3:   // Overcast
+      base = "cloudy"; break;
+
+    // ── Fog ────────────────────────────────────────────────────
+    case 45:  // Fog
+    case 48:  // Depositing rime fog
+      base = "fog"; break;
+
+    // ── Drizzle → rain ─────────────────────────────────────────
+    case 51:  // Light drizzle
+    case 53:  // Moderate drizzle
+    case 55:  // Dense drizzle
+      base = "rain"; break;
+
+    // ── Freezing drizzle → snow ────────────────────────────────
+    case 56:  // Light freezing drizzle
+    case 57:  // Dense freezing drizzle
+      base = "snow"; break;
+
+    // ── Rain ───────────────────────────────────────────────────
+    case 61:  // Light rain
+    case 63:  // Moderate rain
+      base = "rain"; break;
+
+    // ── Heavy rain → storm ─────────────────────────────────────
+    case 65:  // Heavy rain
+      base = "storm"; break;
+
+    // ── Freezing rain → snow ───────────────────────────────────
+    case 66:  // Light freezing rain
+    case 67:  // Heavy freezing rain
+      base = "snow"; break;
+
+    // ── Snow ───────────────────────────────────────────────────
+    case 71:  // Light snow
+    case 73:  // Moderate snow
+    case 75:  // Heavy snow
+    case 77:  // Snow grains
+      base = "snow"; break;
+
+    // ── Rain showers → rain ────────────────────────────────────
+    case 80:  // Light rain showers
+    case 81:  // Moderate rain showers
+      base = "rain"; break;
+
+    // ── Violent showers → storm ────────────────────────────────
+    case 82:  // Violent rain showers
+      base = "storm"; break;
+
+    // ── Snow showers → snow ────────────────────────────────────
+    case 85:  // Light snow showers
+    case 86:  // Heavy snow showers
+      base = "snow"; break;
+
+    // ── Thunderstorm → storm ───────────────────────────────────
+    case 95:  // Thunderstorm (slight or moderate)
+    case 96:  // Thunderstorm with slight hail
+    case 99:  // Thunderstorm with heavy hail
+      base = "storm"; break;
+
+    // ── Unrecognised ───────────────────────────────────────────
+    default:
+      console.warn(`[WeatherFashion] ⚠ unmatched WMO code ${code}: "${condStr}" — using cloudy`);
+      base = "cloudy";
+  }
+
+  console.log(`[WeatherFashion] "${condStr}" (${code}) → ${base} | ${Math.round(tempF)}°F | local hour ${getLocalHour(tz)}`);
+  return base;
+}
+
+const MOOD_COLORS = {
+  hot:     "#E8892A",   // burnt amber
+  sunny:   "#E8B547",   // warm gold
+  golden:  "#C9CDD3",   // pearl
+  cloudy:  "#8A95A0",   // pewter
+  fog:     "#D8D4C9",   // chalk
+  rain:    "#3D5B6B",   // petrol
+  snow:    "#E8EEF0",   // ghost white
+  storm:   "#5B3A56",   // bruise plum
+  night:   "#3B4E8E",   // deep indigo
+};
+
+// ─────────────────────────────────────────────
+// IMAGE DATABASE  (dynamic — loaded from folder listings at boot)
+// ─────────────────────────────────────────────
+
+// Maps mood key → folder name on disk.
+// Add a new folder here if a new mood category is introduced.
+const MOOD_FOLDERS = {
+  sunny:  'Sunny',
+  golden: 'Golden Hour:Partly Cloudy',
+  cloudy: 'Cloudy:Soft Light',
+  fog:    'Fog:Mist',
+  rain:   'Rain',
+  snow:   'Snow',
+  storm:  'Storm',
+  hot:    'Hot',
+  night:  'Night:Overcast Evening',
+};
+
+// Known brand display names (lowercase key → display string).
+// Add new brands here to get proper capitalisation and accents.
+const BRAND_NAMES = {
+  alaia:            'Alaïa',
+  annasui:          'Anna Sui',
+  anndemeulemeester: 'Ann Demeulemeester',
+  balenciaga:       'Balenciaga',
+  bottegaveneta:    'Bottega Veneta',
+  calvinklein:      'Calvin Klein',
+  chanel:           'Chanel',
+  chloe:            'Chloé',
+  christiandior:    'Christian Dior',
+  comedesgarcons:   'Comme des Garçons',   // typo variant in filename
+  commedesgarcons:  'Comme des Garçons',
+  connerives:       'Conner Ives',
+  cynthiarowley:    'Cynthia Rowley',
+  dior:             'Dior',
+  driesvannoten:    'Dries Van Noten',
+  emiliopucci:      'Emilio Pucci',
+  gailliano:        'John Galliano',
+  gucci:            'Gucci',
+  helmutlang:       'Helmut Lang',
+  isseymiyake:      'Issey Miyake',
+  jilsander:        'Jil Sander',
+  jpg:              'Jean Paul Gaultier',
+  'matieres fecales': 'Matières Fécales',
+  mcqueen:          'Alexander McQueen',
+  miumiu:           'Miu Miu',
+  prada:            'Prada',
+  rabanne:          'Rabanne',
+  ralphlauren:      'Ralph Lauren',
+  rodarte:          'Rodarte',
+  saintlaurent:     'Saint Laurent',
+  therow:           'The Row',
+  versace:          'Versace',
+  yohjiyamamoto:    'Yohji Yamamoto',
+  ysl:              'Yves Saint Laurent',
+};
+
+function parseBrand(raw) {
+  const key = raw.toLowerCase();
+  return BRAND_NAMES[key] ?? raw.replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function parseSeason(raw) {
+  // "spring2001" → "Spring/Summer 2001", "fall1997" → "Autumn/Winter 1997"
+  const m = raw.match(/^(spring|ss|summer|fall|fw|autumn|winter)(\d{4})$/i);
+  if (!m) return raw || '—';
+  const [, term, year] = m;
+  if (/spring|ss/i.test(term))        return `Spring/Summer ${year}`;
+  if (/fall|fw|autumn/i.test(term))   return `Autumn/Winter ${year}`;
+  if (/summer/i.test(term))           return `Summer ${year}`;
+  if (/winter/i.test(term))           return `Winter ${year}`;
+  return raw;
+}
+
+// Parse brand and season out of a filename like:
+//   "mood-brandname-fall2000-rtw-3.webp"
+//   "mood-matieres fecales-fall2026.webp"
+function parseImageMeta(filename) {
+  const base  = filename.replace(/\.webp$/i, '');
+  const parts = base.split('-');          // split on hyphens
+  const rest  = parts.slice(1);          // drop the leading mood prefix
+
+  // Find the first part that looks like a season token
+  const seasonIdx = rest.findIndex(p => /^(spring|ss|summer|fall|fw|autumn|winter)\d{4}$/i.test(p));
+
+  let brandRaw, seasonRaw;
+  if (seasonIdx >= 0) {
+    brandRaw  = rest.slice(0, seasonIdx).join('');   // concatenate brand parts
+    seasonRaw = rest[seasonIdx];
+  } else {
+    // No season token found — use everything non-numeric as brand
+    brandRaw  = rest.filter(p => !/^\d+$/.test(p)).join('');
+    seasonRaw = '';
+  }
+
+  return { brand: parseBrand(brandRaw), season: parseSeason(seasonRaw) };
+}
+
+// manifest.json is generated at build time (node generate-manifest.js) and
+// maps each folder name → array of filenames.  It is present on Vercel but
+// absent during local dev (Python http.server).  We fetch it once and cache.
+let _manifest     = null;   // null = not yet attempted
+let _manifestLoad = null;   // memoised promise
+
+function loadManifest() {
+  if (!_manifestLoad) {
+    _manifestLoad = fetch('/manifest.json')
+      .then(r => r.ok ? r.json() : null)
+      .then(data  => { _manifest = data || false; })   // false = confirmed absent
+      .catch(()   => { _manifest = false; });
+  }
+  return _manifestLoad;
+}
+
+// Return image objects for a mood folder.
+// Uses manifest.json when available (production), falls back to parsing
+// Python's http.server HTML directory listing (local dev).
+async function loadFolderImages(mood, folder) {
+  await loadManifest();
+
+  if (_manifest) {
+    // Production path — manifest.json exists
+    const files = (_manifest[folder] || []).filter(f => /\.webp$/i.test(f));
+    return files.map(filename => ({
+      file: `${folder}/${filename}`,
+      ...parseImageMeta(filename),
+    }));
+  }
+
+  // Local dev path — parse Python http.server directory listing
+  const encodedFolder = folder.split('/').map(encodeURIComponent).join('/');
+  const r = await fetch(`${encodedFolder}/`);
+  if (!r.ok) throw new Error(`HTTP ${r.status} for "${folder}/"`);
+  const html = await r.text();
+  const doc  = new DOMParser().parseFromString(html, 'text/html');
+  const files = Array.from(doc.querySelectorAll('a[href]'))
+    .map(a => decodeURIComponent(a.getAttribute('href')))
+    .filter(href => /\.webp$/i.test(href) && !href.includes('/'));
+  return files.map(filename => ({
+    file: `${folder}/${filename}`,
+    ...parseImageMeta(filename),
+  }));
+}
+
+// Per-mood image sets — populated lazily as each mood becomes active.
+let IMG_SETS = {};
+const _folderFetches = {};  // memoises in-flight promises so we never double-fetch
+
+// Load a single mood folder on demand. Safe to call many times — returns the
+// same promise on repeat calls and resolves instantly once already loaded.
+async function ensureMoodLoaded(mood) {
+  if (IMG_SETS[mood]) return;           // already populated
+  if (!_folderFetches[mood]) {
+    const folder = MOOD_FOLDERS[mood];
+    if (!folder) return;
+    _folderFetches[mood] = loadFolderImages(mood, folder)
+      .then(images => {
+        IMG_SETS[mood] = images;
+        console.log(`[WeatherFashion] ${mood}: ${images.length} images`);
+      })
+      .catch(err => {
+        console.warn(`[WeatherFashion] Could not load "${mood}":`, err.message);
+        IMG_SETS[mood] = [];            // mark attempted so we don't retry forever
+      });
+  }
+  return _folderFetches[mood];
+}
+
+// After the first image shows, preload the rest of the active mood in the
+// background so every subsequent crossfade hits the browser cache instantly.
+function preloadMoodImages(mk) {
+  const set = IMG_SETS[mk] || [];
+  set.forEach(img => { (new Image()).src = imgUrl(img.file); });
+}
+
+// Lazily warm up remaining mood folders in the background so switching cities
+// never has to wait for a folder listing it hasn't fetched yet.
+function preloadOtherMoods(activeMood) {
+  Object.keys(MOOD_FOLDERS).forEach(mood => {
+    if (mood !== activeMood) ensureMoodLoaded(mood);
+  });
+}
+
+// Mood key → image set key
+function imgSetKey(mk) {
+  // Each mood now has its own folder; fall back to 'cloudy' for anything unknown.
+  return IMG_SETS[mk] ? mk : 'cloudy';
+}
+
+// URL-safe path for Python static server
+function imgUrl(file) {
+  return file.split('/').map(encodeURIComponent).join('/');
+}
+
+// ─────────────────────────────────────────────
+// SHUFFLE BAG  (no repeat until all shown)
+// ─────────────────────────────────────────────
+const bags = {};
+
+function refillBag(key) {
+  const set = IMG_SETS[key] || [];
+  const indices = set.map((_, i) => i);
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  bags[key] = indices;
+}
+
+function drawFromBag(key) {
+  if (!bags[key] || bags[key].length === 0) refillBag(key);
+  return bags[key].pop();
+}
+
+// ─────────────────────────────────────────────
+// CITY DATA  (fashion-week circuit)
+// ─────────────────────────────────────────────
+const CITIES = [
+  { name: "New York", tz: "America/New_York", lat:  40.7128, lon:  -74.0060 },
+  { name: "London",   tz: "Europe/London",    lat:  51.5074, lon:   -0.1278 },
+  { name: "Paris",    tz: "Europe/Paris",     lat:  48.8566, lon:    2.3522 },
+  { name: "Milan",    tz: "Europe/Rome",      lat:  45.4642, lon:    9.1900 },
+  { name: "Tokyo",    tz: "Asia/Tokyo",       lat:  35.6762, lon:  139.6503 },
+];
+
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+const state = {
+  location: null,
+  weather:  null,
+  unit:     "F",
+  mk:       "partly_day",   // current mood key
+};
+
+// ─────────────────────────────────────────────
+// DOM
+// ─────────────────────────────────────────────
+const qs  = s => document.querySelector(s);
+const qsa = s => Array.from(document.querySelectorAll(s));
+
+// ─────────────────────────────────────────────
+// TIME HELPERS
+// ─────────────────────────────────────────────
+function fmtTime(date, tz) {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz
+  }).format(date);
+}
+function fmtTime24(date, tz) {
+  return new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit", minute: "2-digit", hour12: false, timeZone: tz
+  }).format(date);
+}
+function getLocalHour(tz) {
+  return parseInt(new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit", hour12: false, timeZone: tz
+  }).format(new Date()), 10);
+}
+
+// Returns true if current local time for `tz` is before sunrise or after sunset.
+// `sunrise` / `sunset` are Open-Meteo daily strings: "YYYY-MM-DDTHH:MM" (local time).
+// Falls back to a simple 20:00–06:00 window when the API values are unavailable.
+function isNightTime(tz, sunrise, sunset) {
+  if (!sunrise || !sunset) {
+    const h = getLocalHour(tz);
+    return h >= 20 || h < 6;
+  }
+  // Current local time → total minutes since midnight
+  const nowStr = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit", minute: "2-digit", hour12: false, timeZone: tz
+  }).format(new Date());
+  const [nh, nm] = nowStr.split(":").map(Number);
+  const nowMins = nh * 60 + nm;
+
+  // Parse "YYYY-MM-DDTHH:MM" → minutes since midnight
+  const toMins = iso => {
+    const [h, m] = iso.slice(11).split(":").map(Number);
+    return h * 60 + m;
+  };
+
+  return nowMins < toMins(sunrise) || nowMins >= toMins(sunset);
+}
+
+// ─────────────────────────────────────────────
+// DOMINANT COLOR EXTRACTION
+// ─────────────────────────────────────────────
+
+// Samples a loaded <img> element via an offscreen canvas and returns a CSS
+// colour string representing the perceptually dominant (saturation-weighted)
+// colour. Returns null on any error (CORS taint, zero pixels, etc.)
+function extractDominantColor(imgEl) {
+  try {
+    const SIZE = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = SIZE; canvas.height = SIZE;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(imgEl, 0, 0, SIZE, SIZE);
+    const { data } = ctx.getImageData(0, 0, SIZE, SIZE);
+
+    let r = 0, g = 0, b = 0, w = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const pr = data[i], pg = data[i + 1], pb = data[i + 2];
+      // Skip near-black and near-white — they skew the average without adding mood
+      const lum = 0.299 * pr + 0.587 * pg + 0.114 * pb;
+      if (lum < 18 || lum > 238) continue;
+      // Weight each pixel by its saturation so vivid colours dominate greys
+      const mx = Math.max(pr, pg, pb), mn = Math.min(pr, pg, pb);
+      const sat = mx === 0 ? 0 : (mx - mn) / mx;
+      const weight = 0.25 + sat * 0.75;  // range 0.25 (grey) → 1.0 (fully saturated)
+      r += pr * weight; g += pg * weight; b += pb * weight; w += weight;
+    }
+    if (w < 1) return null;
+
+    // Average then gently push saturation up so the glow reads well blurred
+    let ar = r / w, ag = g / w, ab = b / w;
+    const mx = Math.max(ar, ag, ab), mn = Math.min(ar, ag, ab);
+    if (mx > mn) {
+      const BOOST = 1.2;
+      const mid   = (mx + mn) / 2;
+      ar = mid + (ar - mid) * BOOST;
+      ag = mid + (ag - mid) * BOOST;
+      ab = mid + (ab - mid) * BOOST;
+    }
+    const clamp = v => Math.max(0, Math.min(255, Math.round(v)));
+    return `rgb(${clamp(ar)},${clamp(ag)},${clamp(ab)})`;
+  } catch {
+    return null;   // canvas tainted or image not yet decoded
+  }
+}
+
+// ─────────────────────────────────────────────
+// CROSSFADE IMAGE ENGINE
+// ─────────────────────────────────────────────
+const imgA = qs("#imgA");
+const imgB = qs("#imgB");
+let activeSlot = "a";
+let imgLoading = false;
+
+const runway = qs("#runway");
+
+function crossfadeTo(src) {
+  if (imgLoading) return;
+  const curr = activeSlot === "a" ? imgA : imgB;
+  const next = activeSlot === "a" ? imgB : imgA;
+  imgLoading = true;
+  next.style.opacity = "0";
+
+  function doSwap() {
+    next.style.opacity = "1";
+    curr.style.opacity = "0";
+    activeSlot = activeSlot === "a" ? "b" : "a";
+    imgLoading = false;
+    runway.classList.remove("loading");   // dismiss skeleton on first load
+    // Derive glow colour from this image's actual dominant colour
+    const color = extractDominantColor(next);
+    if (color) document.documentElement.style.setProperty("--mood", color);
+  }
+  next.onload  = doSwap;
+  next.onerror = () => { imgLoading = false; runway.classList.remove("loading"); };
+  next.src = src;
+  if (next.complete && next.naturalWidth) doSwap();
+}
+
+function showNextLook() {
+  const key = imgSetKey(state.mk);
+  const set = IMG_SETS[key] || [];
+  if (!set.length) return;
+  const img = set[drawFromBag(key)];
+  crossfadeTo(imgUrl(img.file));
+  qs("#runwayName").textContent = `${img.brand} — ${img.season}`;
+}
+
+// ─────────────────────────────────────────────
+// RENDER WEATHER
+// ─────────────────────────────────────────────
+function renderTemp() {
+  if (!state.weather) return;
+  let t = state.weather.temp;
+  if (state.unit === "F") t = t * 9/5 + 32;
+  qs("#vTemp").innerHTML = `${Math.round(t)}<span>°</span>`;
+  qs("#unitC").classList.toggle("on", state.unit === "C");
+  qs("#unitF").classList.toggle("on", state.unit === "F");
+}
+
+async function renderWeather() {
+  if (!state.location || !state.weather) return;
+  const { code, isDay } = state.weather;
+
+  // Sidebar
+  qs("#vLocation").textContent = state.location.name;
+
+  // Stage weather
+  qs("#vCondition").textContent = WMO[code] || "—";
+  qs("#vWxIcon").textContent    = wxIcon(code, isDay);
+  renderTemp();
+
+  // Mood aura + night mode
+  const mk = moodKey(code, state.weather.temp, state.location.tz, state.weather.sunrise, state.weather.sunset);
+  state.mk = mk;
+  document.documentElement.style.setProperty("--mood", MOOD_COLORS[mk] || "#c9cdd3");
+  document.documentElement.classList.toggle("night", mk === "night");
+
+  // Time
+  qs("#vTime").textContent = fmtTime(new Date(), state.location.tz);
+
+  // Ensure this mood's folder listing is ready, then show the first image.
+  // Other moods load silently in the background after a short delay.
+  await ensureMoodLoaded(mk);
+  showNextLook();
+
+  // Background: preload the rest of this mood right away so subsequent
+  // crossfades are instant, then lazily warm up the other mood folders.
+  preloadMoodImages(mk);
+  setTimeout(() => preloadOtherMoods(mk), 1500);
+}
+
+// ─────────────────────────────────────────────
+// CITIES
+// ─────────────────────────────────────────────
+function renderCities() {
+  const list = qs("#cityList");
+  list.innerHTML = CITIES.map((c, i) => `
+    <li class="city" data-i="${i}">
+      <span>${c.name}</span>
+      <span class="city-time" data-tz="${c.tz}">—</span>
+    </li>`).join("");
+  qsa(".city").forEach(el => {
+    el.addEventListener("click", () => {
+      const c = CITIES[+el.dataset.i];
+      setLocation({ name: c.name, lat: c.lat, lon: c.lon, tz: c.tz });
+    });
+  });
+  tickClocks();
+}
+
+function tickClocks() {
+  const now = new Date();
+  qsa(".city-time").forEach(el => {
+    el.textContent = fmtTime(now, el.dataset.tz);
+  });
+  if (state.location) {
+    qs("#vTime").textContent = fmtTime(now, state.location.tz);
+  }
+  qsa(".city").forEach(el => {
+    const c = CITIES[+el.dataset.i];
+    el.classList.toggle("active", c.name === state.location?.name);
+  });
+}
+
+// ─────────────────────────────────────────────
+// WEATHER FETCH
+// ─────────────────────────────────────────────
+async function fetchWeather(lat, lon) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
+    + `&current=temperature_2m,weather_code,is_day`
+    + `&daily=sunrise,sunset`
+    + `&temperature_unit=celsius&timezone=auto&forecast_days=1`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("weather fetch failed");
+  const j = await r.json();
+  return {
+    temp:    j.current.temperature_2m,
+    code:    j.current.weather_code,
+    isDay:   j.current.is_day === 1,
+    tz:      j.timezone,
+    sunrise: j.daily?.sunrise?.[0] ?? null,  // "YYYY-MM-DDTHH:MM" local time
+    sunset:  j.daily?.sunset?.[0]  ?? null,
+  };
+}
+
+async function geocode(q) {
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=5&language=en&format=json`;
+  const r = await fetch(url);
+  if (!r.ok) return [];
+  const j = await r.json();
+  return j.results || [];
+}
+
+async function setLocation(loc) {
+  state.location = loc;
+  qs("#vLocation").textContent = loc.name;
+  try {
+    const w = await fetchWeather(loc.lat, loc.lon);
+    state.weather = w;
+    if (!loc.tz) state.location.tz = w.tz;
+    await renderWeather();
+    tickClocks();
+  } catch {
+    qs("#vCondition").textContent = "weather unavailable";
+  }
+}
+
+// ─────────────────────────────────────────────
+// SEARCH
+// ─────────────────────────────────────────────
+function setupSearch() {
+  const input   = qs("#searchInput");
+  const results = qs("#searchResults");
+  let timer;
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 2) { results.classList.remove("open"); results.innerHTML = ""; return; }
+    timer = setTimeout(async () => {
+      const items = await geocode(q);
+      results.innerHTML = items.length
+        ? items.map((it, i) => `<div class="search-result" data-i="${i}">${it.name}${it.country ? ` · ${it.country}` : ""}</div>`).join("")
+        : `<div class="search-result">no result</div>`;
+      results.classList.add("open");
+      results.querySelectorAll(".search-result").forEach((el, idx) => {
+        el.addEventListener("click", () => {
+          const it = items[idx];
+          if (!it) return;
+          setLocation({ name: it.name, lat: it.latitude, lon: it.longitude, tz: it.timezone });
+          input.value = "";
+          results.classList.remove("open");
+          results.innerHTML = "";
+          if (window.innerWidth <= 900) closeSidebar();
+        });
+      });
+    }, 260);
+  });
+}
+
+// ─────────────────────────────────────────────
+// GEOLOCATION
+// ─────────────────────────────────────────────
+
+// Reverse-geocode GPS coords → city name
+async function reverseGeocode(lat, lon) {
+  try {
+    const r = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
+    );
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    return d.city || d.locality || d.principalSubdivision || null;
+  } catch {
+    return null;
+  }
+}
+
+// Try GPS first; fall back to IP-based location (no permission needed).
+// Preserves the raw GeolocationPositionError on the thrown error so callers
+// can surface the actual code + message to the user.
+async function detectLocation() {
+  let geoErr = null;
+
+  // 1. Precise GPS / Wi-Fi geolocation
+  if (navigator.geolocation) {
+    try {
+      const pos = await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          timeout: 6000, maximumAge: 60000
+        })
+      );
+      const { latitude: lat, longitude: lon } = pos.coords;
+      const name = await reverseGeocode(lat, lon) || "My Location";
+      return { name, lat, lon };
+    } catch (e) {
+      geoErr = e;   // preserve for diagnostics; fall through to IP
+    }
+  }
+
+  // 2. IP-based fallback — works without any browser permission
+  try {
+    const r = await fetch("https://ipapi.co/json/");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    if (!d.latitude || !d.longitude) throw new Error("no coordinates in response");
+    return {
+      name: d.city || d.region || "My Location",
+      lat:  d.latitude,
+      lon:  d.longitude,
+    };
+    // tz intentionally omitted — setLocation will use Open-Meteo timezone=auto
+  } catch (ipErr) {
+    // Both failed — attach all diagnostic info to the thrown error
+    const err = new Error("Location detection failed");
+    err.geoErr = geoErr;
+    err.ipErr  = ipErr;
+    throw err;
+  }
+}
+
+function setupLocate() {
+  const btn      = qs("#locateBtn");
+  const icon     = btn.querySelector(".ms");
+  const label    = btn.querySelectorAll("span")[1];
+  const errorDiv = qs("#locateError");
+
+  function showError(lines) {
+    errorDiv.innerHTML = lines.map(l => `<div>${l}</div>`).join("");
+    errorDiv.classList.add("visible");
+  }
+  function hideError() {
+    errorDiv.classList.remove("visible");
+    errorDiv.innerHTML = "";
+  }
+
+  btn.addEventListener("click", async () => {
+    hideError();
+
+    // Loading state
+    btn.disabled = true;
+    icon.textContent = "sync";
+    icon.style.animation = "spin 1s linear infinite";
+    label.textContent = "Locating…";
+
+    function restoreBtn() {
+      btn.disabled = false;
+      icon.style.animation = "";
+      icon.textContent = "my_location";
+      label.textContent = "Use my location";
+    }
+
+    try {
+      const loc = await detectLocation();
+      restoreBtn();
+      setLocation(loc);
+      if (window.innerWidth <= 900) closeSidebar();
+    } catch (err) {
+      restoreBtn();
+
+      // Build diagnostic lines
+      const lines = ["⚠ Location failed"];
+
+      if (err.geoErr) {
+        const GEO_CODES = { 1: "PERMISSION_DENIED", 2: "POSITION_UNAVAILABLE", 3: "TIMEOUT" };
+        const ge = err.geoErr;
+        lines.push(`GPS — code ${ge.code} (${GEO_CODES[ge.code] ?? "UNKNOWN"}): ${ge.message}`);
+      } else if (!navigator.geolocation) {
+        lines.push("GPS — navigator.geolocation not available");
+      }
+
+      if (err.ipErr) {
+        lines.push(`IP fallback — ${err.ipErr.message}`);
+      }
+
+      showError(lines);
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// UNIT TOGGLE
+// ─────────────────────────────────────────────
+function setupUnitToggle() {
+  qs("#unitToggle").addEventListener("click", () => {
+    state.unit = state.unit === "C" ? "F" : "C";
+    renderTemp();
+  });
+}
+
+
+// ─────────────────────────────────────────────
+// HAMBURGER  (mobile dropdown)
+// ─────────────────────────────────────────────
+function closeSidebar() {
+  const sidebar = qs("#sidebar");
+  const btn     = qs("#hamburger");
+  const icon    = qs("#hamburgerIcon");
+  if (!sidebar.classList.contains("open")) return;
+  sidebar.classList.remove("open");
+  btn.classList.remove("open");
+  icon.style.opacity = "0";
+  setTimeout(() => { icon.textContent = "menu"; icon.style.opacity = "1"; }, 150);
+}
+
+function setupHamburger() {
+  const btn     = qs("#hamburger");
+  const sidebar = qs("#sidebar");
+  const icon    = qs("#hamburgerIcon");
+
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    const isOpen = sidebar.classList.toggle("open");
+    btn.classList.toggle("open", isOpen);
+    icon.style.opacity = "0";
+    setTimeout(() => { icon.textContent = isOpen ? "close" : "menu"; icon.style.opacity = "1"; }, 150);
+  });
+
+  document.addEventListener("click", e => {
+    if (window.innerWidth > 900) return;
+    if (!sidebar.classList.contains("open")) return;
+    if (e.target.closest("#sidebar") && !e.target.closest(".city, #locateBtn")) return;
+    setTimeout(closeSidebar, e.target.closest(".city, #locateBtn") ? 200 : 0);
+  });
+}
+
+// ─────────────────────────────────────────────
+// RESIZE GUARD  (disable transitions while dragging viewport)
+// ─────────────────────────────────────────────
+function setupResizeGuard() {
+  let t;
+  window.addEventListener("resize", () => {
+    document.body.classList.add("resizing");
+    clearTimeout(t);
+    t = setTimeout(() => document.body.classList.remove("resizing"), 180);
+  });
+}
+
+// ─────────────────────────────────────────────
+// BOOT
+// ─────────────────────────────────────────────
+function boot() {
+  renderCities();
+  setupSearch();
+  setupLocate();
+  setupUnitToggle();
+  setupHamburger();
+  setupResizeGuard();
+
+  // Kick off manifest fetch immediately so it's ready before the first mood loads.
+  // Skeleton is already on the runway element (set in HTML).
+  loadManifest();
+
+  const fallback = () => {
+    const ny = CITIES[0]; // New York
+    setLocation({ name: ny.name, lat: ny.lat, lon: ny.lon, tz: ny.tz });
+  };
+
+  detectLocation().then(loc => setLocation(loc)).catch(fallback);
+
+  setInterval(tickClocks, 1000);
+}
+
+document.addEventListener("DOMContentLoaded", boot);
+</script>
+</body>
+</html>
