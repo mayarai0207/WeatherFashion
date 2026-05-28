@@ -1242,45 +1242,69 @@ async function reverseGeocode(lat, lon) {
   }
 }
 
-// Location detection: GPS first, IP fallback only on timeout.
-// PERMISSION_DENIED and POSITION_UNAVAILABLE surface as errors — only a
-// timeout triggers the IP fallback, since that just means GPS was slow.
-async function detectLocation() {
+// ── GPS coordinate cache (localStorage) ──────────────────
+const GPS_CACHE_KEY = 'wf_gps';
+const GPS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function saveGpsCache(lat, lon) {
+  try { localStorage.setItem(GPS_CACHE_KEY, JSON.stringify({ lat, lon, ts: Date.now() })); } catch {}
+}
+function loadGpsCache() {
+  try {
+    const d = JSON.parse(localStorage.getItem(GPS_CACHE_KEY) || 'null');
+    return d && (Date.now() - d.ts < GPS_CACHE_TTL) ? { lat: d.lat, lon: d.lon } : null;
+  } catch { return null; }
+}
+
+// Returns { lat, lon } only.
+// Uses maximumAge:300000 so the browser returns a cached fix instantly on
+// repeat taps. Falls back to our localStorage cache, then to IP on timeout.
+async function getGpsCoords() {
   if (navigator.geolocation) {
     try {
       const pos = await new Promise((resolve, reject) =>
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           timeout:            15000,
-          maximumAge:         60000,
+          maximumAge:         300000,  // accept fixes up to 5 min old → instant on repeat
           enableHighAccuracy: false,
         })
       );
       const { latitude: lat, longitude: lon } = pos.coords;
-      const name = await reverseGeocode(lat, lon) || "My Location";
-      return { name, lat, lon };
+      saveGpsCache(lat, lon);
+      return { lat, lon };
     } catch (e) {
-      // Only fall through to IP on timeout; surface all other errors directly
-      if (e.code !== 3) {
+      if (e.code !== 3) {          // not a timeout — hard error (denied / unavailable)
         const err = new Error("Location detection failed");
         err.geoErr = e;
         throw err;
       }
-      // code 3 = TIMEOUT — try IP fallback below
+      // timeout — fall through to cache then IP
     }
   }
 
-  // IP fallback — used when GPS times out or is unavailable in this browser
+  // localStorage cache (our own backup when GPS times out)
+  const cached = loadGpsCache();
+  if (cached) return cached;
+
+  // IP fallback (last resort)
   try {
     const r = await fetch("https://ipapi.co/json/");
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
     if (!d.latitude || !d.longitude) throw new Error("no coordinates in response");
-    return { name: d.city || d.region || "My Location", lat: d.latitude, lon: d.longitude };
+    return { lat: d.latitude, lon: d.longitude };
   } catch (ipErr) {
     const err = new Error("Location detection failed");
     err.ipErr = ipErr;
     throw err;
   }
+}
+
+// Full detection with city name — used at boot (sequential is fine there).
+async function detectLocation() {
+  const { lat, lon } = await getGpsCoords();
+  const name = await reverseGeocode(lat, lon) || "My Location";
+  return { name, lat, lon };
 }
 
 function setupLocate() {
@@ -1315,16 +1339,31 @@ function setupLocate() {
     }
 
     try {
-      const loc = await detectLocation();
+      // Step 1 — get coordinates (instant if cached, otherwise waits for GPS)
+      const { lat, lon } = await getGpsCoords();
       restoreBtn();
-      setLocation(loc);
       if (window.innerWidth <= 900) closeSidebar();
+
+      // Step 2 — show placeholder name + skeleton immediately so UI feels instant
+      qs("#vLocation").textContent = "My Location";
+      runway.classList.add("loading");
+
+      // Step 3 — reverse geocoding and weather fetch in parallel
+      const [name, weather] = await Promise.all([
+        reverseGeocode(lat, lon).then(n => n || "My Location"),
+        fetchWeather(lat, lon),
+      ]);
+
+      // Step 4 — commit full state and render
+      state.location = { name, lat, lon, tz: weather.tz };
+      state.weather  = weather;
+      await renderWeather();
+      tickClocks();
     } catch (err) {
       restoreBtn();
+      runway.classList.remove("loading");
 
-      // Build diagnostic lines
       const lines = ["⚠ Location failed"];
-
       if (err.geoErr) {
         const ge = err.geoErr;
         lines.push(ge.code === 1
@@ -1333,7 +1372,6 @@ function setupLocate() {
       } else if (err.ipErr) {
         lines.push(`Could not determine location — ${err.ipErr.message}`);
       }
-
       showError(lines);
     }
   });
