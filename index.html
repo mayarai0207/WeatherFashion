@@ -425,6 +425,12 @@
 
   /* ── Mobile (≤900px) ──────────────────────────────────── */
   @media (max-width: 900px) {
+    html, body {
+      overflow: hidden;
+      height: 100%;
+      position: fixed;
+      width: 100%;
+    }
     .layout { grid-template-columns: 1fr; }
 
     /* Sidebar becomes an animated dropdown */
@@ -1342,7 +1348,6 @@ function closeSidebar() {
   if (!sidebar.classList.contains("open")) return;
   sidebar.classList.remove("open");
   btn.classList.remove("open");
-  document.body.style.overflow = "";
   icon.style.opacity = "0";
   setTimeout(() => { icon.textContent = "menu"; icon.style.opacity = "1"; }, 150);
 }
@@ -1356,7 +1361,6 @@ function setupHamburger() {
     e.stopPropagation();
     const isOpen = sidebar.classList.toggle("open");
     btn.classList.toggle("open", isOpen);
-    document.body.style.overflow = isOpen ? "hidden" : "";
     icon.style.opacity = "0";
     setTimeout(() => { icon.textContent = isOpen ? "close" : "menu"; icon.style.opacity = "1"; }, 150);
   });
