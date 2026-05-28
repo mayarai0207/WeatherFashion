@@ -1359,7 +1359,7 @@ function alignSidebarToNav() {
   const nav     = qs("#stageWeather");
   const sidebar = qs("#sidebar");
   if (nav && sidebar) {
-    sidebar.style.top = Math.round(nav.getBoundingClientRect().bottom) + "px";
+    sidebar.style.top = (Math.round(nav.getBoundingClientRect().bottom) + 12) + "px";
   }
 }
 
