@@ -1233,47 +1233,35 @@ async function reverseGeocode(lat, lon) {
   }
 }
 
-// Try GPS first; fall back to IP-based location (no permission needed).
-// Preserves the raw GeolocationPositionError on the thrown error so callers
-// can surface the actual code + message to the user.
+// GPS-only location detection. Never falls back to IP — IP geolocation is
+// city-level at best and often wrong. If GPS is unavailable or denied, the
+// caller receives a clear error with the exact GeolocationPositionError code.
 async function detectLocation() {
-  let geoErr = null;
-
-  // 1. Precise GPS / Wi-Fi geolocation
-  if (navigator.geolocation) {
-    try {
-      const pos = await new Promise((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          timeout: 6000, maximumAge: 60000
-        })
-      );
-      const { latitude: lat, longitude: lon } = pos.coords;
-      const name = await reverseGeocode(lat, lon) || "My Location";
-      return { name, lat, lon };
-    } catch (e) {
-      geoErr = e;   // preserve for diagnostics; fall through to IP
-    }
-  }
-
-  // 2. IP-based fallback — works without any browser permission
-  try {
-    const r = await fetch("https://ipapi.co/json/");
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const d = await r.json();
-    if (!d.latitude || !d.longitude) throw new Error("no coordinates in response");
-    return {
-      name: d.city || d.region || "My Location",
-      lat:  d.latitude,
-      lon:  d.longitude,
-    };
-    // tz intentionally omitted — setLocation will use Open-Meteo timezone=auto
-  } catch (ipErr) {
-    // Both failed — attach all diagnostic info to the thrown error
+  if (!navigator.geolocation) {
     const err = new Error("Location detection failed");
-    err.geoErr = geoErr;
-    err.ipErr  = ipErr;
+    err.geoErr = { code: 0, message: "navigator.geolocation is not available in this browser" };
     throw err;
   }
+
+  let pos;
+  try {
+    pos = await new Promise((resolve, reject) =>
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        timeout:            10000,  // 10 s — enough for a cold GPS fix
+        maximumAge:         0,      // always request a fresh position
+        enableHighAccuracy: false,  // network/Wi-Fi accuracy is sufficient
+      })
+    );
+  } catch (e) {
+    const err = new Error("Location detection failed");
+    err.geoErr = e;
+    throw err;
+  }
+
+  // Use the exact GPS coordinates for reverse geocoding — no IP involved
+  const { latitude: lat, longitude: lon } = pos.coords;
+  const name = await reverseGeocode(lat, lon) || "My Location";
+  return { name, lat, lon };
 }
 
 function setupLocate() {
@@ -1321,13 +1309,10 @@ function setupLocate() {
       if (err.geoErr) {
         const GEO_CODES = { 1: "PERMISSION_DENIED", 2: "POSITION_UNAVAILABLE", 3: "TIMEOUT" };
         const ge = err.geoErr;
-        lines.push(`GPS — code ${ge.code} (${GEO_CODES[ge.code] ?? "UNKNOWN"}): ${ge.message}`);
-      } else if (!navigator.geolocation) {
-        lines.push("GPS — navigator.geolocation not available");
-      }
-
-      if (err.ipErr) {
-        lines.push(`IP fallback — ${err.ipErr.message}`);
+        const label = GEO_CODES[ge.code] ?? "UNAVAILABLE";
+        lines.push(ge.code === 1
+          ? "Location permission denied — enable it in your browser settings"
+          : `GPS error — ${label}: ${ge.message}`);
       }
 
       showError(lines);
