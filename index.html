@@ -433,10 +433,10 @@
     }
     .layout { grid-template-columns: 1fr; }
 
-    /* Sidebar becomes an animated dropdown */
+    /* Sidebar becomes an animated dropdown — top is set dynamically by JS */
     .sidebar {
       position: fixed !important;
-      top: 112px;
+      top: 80px;
       left: 16px;
       right: 16px;
       bottom: auto !important;
@@ -1352,6 +1352,17 @@ function closeSidebar() {
   setTimeout(() => { icon.textContent = "menu"; icon.style.opacity = "1"; }, 150);
 }
 
+// Measures the exact bottom edge of the top nav bar and pins the sidebar
+// flush underneath it, accounting for justify-content:center shifting it.
+function alignSidebarToNav() {
+  if (window.innerWidth > 900) return;
+  const nav     = qs("#stageWeather");
+  const sidebar = qs("#sidebar");
+  if (nav && sidebar) {
+    sidebar.style.top = Math.round(nav.getBoundingClientRect().bottom) + "px";
+  }
+}
+
 function setupHamburger() {
   const btn     = qs("#hamburger");
   const sidebar = qs("#sidebar");
@@ -1359,6 +1370,7 @@ function setupHamburger() {
 
   btn.addEventListener("click", e => {
     e.stopPropagation();
+    alignSidebarToNav();          // snap to exact nav bottom before animating in
     const isOpen = sidebar.classList.toggle("open");
     btn.classList.toggle("open", isOpen);
     icon.style.opacity = "0";
@@ -1371,6 +1383,9 @@ function setupHamburger() {
     if (e.target.closest("#sidebar") && !e.target.closest(".city, #locateBtn")) return;
     setTimeout(closeSidebar, e.target.closest(".city, #locateBtn") ? 200 : 0);
   });
+
+  // Re-align if the viewport resizes (orientation change, etc.)
+  window.addEventListener("resize", alignSidebarToNav);
 }
 
 // ─────────────────────────────────────────────
